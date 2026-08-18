@@ -1,0 +1,3 @@
+# essential for root operations by "liveuser" as it has no password set
+#
+liveuser ALL=(ALL) NOPASSWD:ALL

@@ -1,0 +1,18 @@
+[Unit]
+#
+# required mount point fix so the installer can work
+# (this file will be automatically removed upon first boot)
+#
+Description=mount pint fix casper/subiquity need, live boots only
+DefaultDependencies=no
+Before=sysinit.target shutdown.target
+Conflicts=shutdown.target
+ConditionPathIsDirectory=/run/overlay/live
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/bin/sh -c 'mkdir -p /cdrom && mountpoint -q /cdrom || mount --bind /run/overlay/live /cdrom'
+
+[Install]
+WantedBy=sysinit.target

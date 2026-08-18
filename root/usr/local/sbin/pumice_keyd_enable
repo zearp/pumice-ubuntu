@@ -1,0 +1,19 @@
+#!/bin/sh
+#
+# keyd enabler, edit /etc/keyd/default.conf first
+# to disable run pumice_keyd_disable
+set -eu
+
+if [ "$(id -u)" -ne 0 ]; then
+    echo "pumice_keyd_enable: must be run as root (sudo)" >&2
+    exit 1
+fi
+
+systemctl unmask keyd.service
+systemctl enable --now keyd.service
+
+echo "keyd enabled - current status:"
+systemctl --no-pager status keyd.service || true
+echo
+echo "edit /etc/keyd/default.conf then run 'keyd reload' to apply changes"
+echo "without restarting the service. run pumice_keyd_disable to revert."

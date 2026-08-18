@@ -1,0 +1,35 @@
+#!/bin/bash
+#
+# creates the live-session-only "liveuser" account during boot
+# (this file will be automatically removed upon first boot)
+#
+set -euo pipefail
+
+log() { echo "pumice_liveuser_setup: $*" | systemd-cat -t pumice_liveuser_setup; }
+
+root_fstype=$(findmnt -no FSTYPE / || echo unknown)
+
+if [ "${root_fstype}" != "overlay" ]; then
+    log "root is ${root_fstype}, not a live session - nothing to do."
+    exit 0
+fi
+
+if id -u liveuser >/dev/null 2>&1; then
+    log "liveuser already exists - nothing to do."
+    exit 0
+fi
+
+log "root is an overlay (live session) - creating liveuser."
+
+for grp in adm sudo cdrom dip plugdev lpadmin sambashare nopasswdlogin; do
+    getent group "${grp}" >/dev/null || groupadd --system "${grp}"
+done
+
+useradd \
+    --create-home \
+    --shell /usr/bin/zsh \
+    --groups adm,sudo,cdrom,dip,plugdev,lpadmin,sambashare,nopasswdlogin \
+    --password '!' \
+    liveuser
+
+exit 0

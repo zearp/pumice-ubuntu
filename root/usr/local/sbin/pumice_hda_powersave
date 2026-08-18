@@ -1,0 +1,39 @@
+#!/bin/sh
+#
+# prevents pops on mains power by setting snd_hda_intel codec/controller runtime
+# power saving according to whether the machine is on battery or mains power
+# see /etc/udev/rules.d/60-kiwi-ubuntu-hda-powersave.rules for triggers
+#
+set -eu
+
+[ -d /sys/module/snd_hda_intel ] || exit 0
+
+mains_found=0
+on_ac=0
+for ps in /sys/class/power_supply/*/; do
+    [ -r "${ps}type" ] || continue
+    [ "$(cat "${ps}type" 2>/dev/null || true)" = "Mains" ] || continue
+    mains_found=1
+    if [ "$(cat "${ps}online" 2>/dev/null || echo 0)" = "1" ]; then
+        on_ac=1
+    fi
+done
+
+[ "${mains_found}" = "1" ] || on_ac=1
+
+if [ "${on_ac}" = "1" ]; then
+    save=0
+    controller=N
+else
+    save=1
+    controller=Y
+fi
+
+if [ -w /sys/module/snd_hda_intel/parameters/power_save ]; then
+    echo "${save}" > /sys/module/snd_hda_intel/parameters/power_save
+fi
+if [ -w /sys/module/snd_hda_intel/parameters/power_save_controller ]; then
+    echo "${controller}" > /sys/module/snd_hda_intel/parameters/power_save_controller
+fi
+
+exit 0

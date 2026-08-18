@@ -1,0 +1,16 @@
+# needed by subiquity/ubuntu-desktop-bootstrap, installs will fail without
+#
+version: 2
+kernel:
+  default: linux-generic
+sources:
+  - id: ubuntu-desktop-minimal
+    variant: desktop-minimal
+    name:
+      en: "Ubuntu"
+    description:
+      en: "Ubuntu 26.04 desktop install."
+    type: fsimage
+    path: ../LiveOS/squashfs.img
+    size: 2070601728
+    default: true

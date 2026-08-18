@@ -1,0 +1,3 @@
+# install will fail is this file is missing, can be left empty
+# (this file will be automatically removed upon first boot)
+#
