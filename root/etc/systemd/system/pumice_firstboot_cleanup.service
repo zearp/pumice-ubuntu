@@ -1,0 +1,15 @@
+[Unit]
+Description=start firstboot clean up service, installed system only
+#
+# (this file will be automatically removed upon first boot)
+#
+After=multi-user.target
+ConditionPathExists=/usr/local/sbin/pumice_firstboot_cleanup
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/pumice_firstboot_cleanup
+RemainAfterExit=no
+
+[Install]
+WantedBy=multi-user.target

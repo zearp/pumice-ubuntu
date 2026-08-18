@@ -1,0 +1,17 @@
+[Unit]
+Description=mask zfs auto-import/auto-mount, live boots only
+#
+# (this file will be automatically removed upon first boot)
+#
+DefaultDependencies=no
+After=local-fs.target
+Before=sysinit.target zfs.target zfs-import.target
+ConditionPathExists=/usr/local/sbin/pumice_live_zfs_mask
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/pumice_live_zfs_mask
+RemainAfterExit=yes
+
+[Install]
+WantedBy=sysinit.target

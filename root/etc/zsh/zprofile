@@ -1,0 +1,4 @@
+# this sources /etc/profile.d/*
+# needed to have ubuntu bashisms in zsh
+#
+emulate sh -c 'source /etc/profile'

@@ -1,0 +1,5 @@
+ACTION=="add", SUBSYSTEM=="sound", KERNEL=="card*", DRIVERS=="snd_hda_intel", \
+    RUN+="/usr/local/sbin/pumice_hda_powersave"
+
+ACTION=="add|change", SUBSYSTEM=="power_supply", ATTR{type}=="Mains", \
+    RUN+="/usr/local/sbin/pumice_hda_powersave"
