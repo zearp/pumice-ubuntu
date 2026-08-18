@@ -1,0 +1,17 @@
+[Unit]
+Description=start early clean up service, installed system only
+#
+# (this file will be automatically removed upon first boot)
+#
+DefaultDependencies=no
+After=local-fs.target
+Before=display-manager.service sysinit.target
+ConditionPathExists=/usr/local/sbin/pumice_early_cleanup
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/pumice_early_cleanup
+RemainAfterExit=yes
+
+[Install]
+WantedBy=sysinit.target

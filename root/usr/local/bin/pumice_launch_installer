@@ -1,0 +1,9 @@
+#!/bin/bash
+#
+# fix installer trying to start too early
+# (this file will be automatically removed upon first boot)
+#
+set -euo pipefail
+
+snap wait system seed.loaded 2>/dev/null
+exec /snap/bin/ubuntu-desktop-bootstrap

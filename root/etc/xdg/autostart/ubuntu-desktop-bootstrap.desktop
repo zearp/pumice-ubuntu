@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Version=1.0
+Name=Install Ubuntu
+Comment=Install this system permanently to your hard disk
+Keywords=ubiquity;
+Exec=/usr/local/bin/pumice_launch_installer
+Icon=ubiquity
+Terminal=false
+Categories=GTK;System;Settings;

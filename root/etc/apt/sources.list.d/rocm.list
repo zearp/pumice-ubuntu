@@ -1,0 +1,2 @@
+#deb [arch=amd64 signed-by=/etc/apt/keyrings/rocm.gpg] https://repo.radeon.com/rocmradeon/apt/26.13 resolute main
+#deb [arch=amd64,i386 signed-by=/etc/apt/keyrings/rocm.gpg] https://repo.radeon.com/graphics/26.13/ubuntu resolute main

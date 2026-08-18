@@ -1,0 +1,191 @@
+#!/bin/bash
+#
+# read-only checker for a fresh pumice install, run it after the first boot
+# usage: sudo pumice_postinstall_check
+#
+set -u
+
+if [ "$(id -u)" -ne 0 ]; then
+    echo "run as root (sudo)" >&2
+    exit 1
+fi
+
+pass=0
+fail=0
+
+ok()   { printf '  [ ok ] %s\n' "$*"; pass=$((pass + 1)); }
+bad()  { printf '  [FAIL] %s\n' "$*"; fail=$((fail + 1)); }
+info() { printf '  [info] %s\n' "$*"; }
+head_() { printf '\n== %s\n' "$*"; }
+
+gone() {
+    # path (or glob) should not exist
+    local p
+    for p in "$@"; do
+        # shellcheck disable=SC2086
+        if compgen -G "$p" >/dev/null || [ -e "$p" ]; then
+            bad "left over: $p"
+        else
+            ok "gone: $p"
+        fi
+    done
+}
+
+pkg_installed() { dpkg-query -W -f='${Status}' "$1" 2>/dev/null | grep -q '^install ok installed'; }
+
+root_fstype=$(findmnt -no FSTYPE / 2>/dev/null || echo unknown)
+kver=$(uname -r)
+initrd="/boot/initrd.img-${kver}"
+
+head_ "system"
+info "kernel ${kver}, root filesystem ${root_fstype}"
+if [ "${root_fstype}" = "overlay" ]; then
+    bad "this is a live session, the checker is for installed systems"
+fi
+
+# decide if this system counts as "using zfs", same idea as pumice_firstboot_cleanup
+zfs_members=$(blkid -t TYPE=zfs_member -o device 2>/dev/null || true)
+zfs_in_use=0
+if [ "${root_fstype}" = "zfs" ] \
+    || [ -n "$(findmnt -rn -t zfs 2>/dev/null)" ] \
+    || [ -n "$(zpool list -H 2>/dev/null)" ] \
+    || [ -n "${zfs_members}" ]; then
+    zfs_in_use=1
+fi
+if [ "${zfs_in_use}" = "1" ]; then
+    info "zfs in use or zfs member device present, expecting zfs support to be KEPT"
+    [ -n "${zfs_members}" ] && info "zfs_member devices: $(echo "${zfs_members}" | tr '\n' ' ')"
+else
+    info "no zfs pool or member device, expecting zfs support to be REMOVED"
+fi
+
+head_ "live-only files and services are gone"
+gone /usr/local/sbin/pumice_firstboot_cleanup \
+     /usr/local/sbin/pumice_early_cleanup \
+     /usr/local/sbin/pumice_liveuser_setup \
+     /usr/local/sbin/pumice_live_zfs_mask \
+     /usr/local/sbin/pumice_backlight_default \
+     /usr/local/bin/pumice_launch_installer \
+     /etc/systemd/system/pumice_cdrom_compat.service \
+     /etc/systemd/system/pumice_early_cleanup.service \
+     /etc/systemd/system/pumice_firstboot_cleanup.service \
+     /etc/systemd/system/pumice_liveuser_setup.service \
+     /etc/systemd/system/pumice_live_zfs_mask.service \
+     /etc/xdg/autostart/ubuntu-desktop-bootstrap.desktop \
+     /etc/polkit-1/rules.d/60-pumice_live_snapd.rules \
+     /etc/sudoers.d/liveuser \
+     /etc/apt/sources.list.d/cdrom.sources \
+     /etc/apt/sources.list.d/ubuntu.sources.curtin.orig \
+     /etc/udev/rules.d/51-pumice_backlight_default.rules \
+     '/var/lib/pumice-backlight-*' \
+     /etc/dconf/db/local.d/99-pumice_live \
+     /etc/systemd/user/gnome-initial-setup-first-login.service \
+     /etc/dracut.conf.d/90-pumice_live_no_zfs.conf \
+     /etc/default/grub.d/99-pumice_firstboot.cfg \
+     /cdrom
+
+head_ "liveuser, users and gdm"
+if id -u liveuser >/dev/null 2>&1; then
+    bad "liveuser exists"
+else
+    ok "liveuser does not exist"
+fi
+if grep -qs '^AutomaticLogin=liveuser' /etc/gdm3/custom.conf; then
+    bad "gdm3 custom.conf still autologins liveuser"
+else
+    ok "gdm3 custom.conf has no liveuser autologin"
+fi
+if real_user=$(getent passwd 1000 | cut -d: -f1) && [ -n "${real_user}" ]; then
+    shell=$(getent passwd 1000 | cut -d: -f7)
+    if [ "${shell}" = "/usr/bin/zsh" ]; then
+        ok "uid 1000 (${real_user}) shell is zsh"
+    else
+        bad "uid 1000 (${real_user}) shell is ${shell}, expected /usr/bin/zsh"
+    fi
+else
+    bad "no uid 1000 user found"
+fi
+
+head_ "snaps and live-only packages"
+if command -v snap >/dev/null 2>&1 || pkg_installed snapd; then
+    bad "snapd is still installed"
+else
+    ok "snapd removed"
+fi
+gone /var/lib/snapd /snap
+for p in kiwi-dracut-live xorriso dialog; do
+    if pkg_installed "${p}"; then bad "package still installed: ${p}"; else ok "package removed: ${p}"; fi
+done
+
+head_ "sleep targets and grub"
+for t in sleep suspend hibernate hybrid-sleep; do
+    state=$(systemctl is-enabled "${t}.target" 2>&1 || true)
+    if [ "${state}" = "masked" ]; then bad "${t}.target is still masked"; else ok "${t}.target not masked (${state})"; fi
+done
+want='GRUB_CMDLINE_LINUX_DEFAULT="quiet splash vt.global_cursor_default=0 intel_iommu=on amd_iommu=on iommu=pt thunderbolt.host_reset=false biosdevname=0 net.ifnames=0"'
+if grep -qxF "${want}" /etc/default/grub 2>/dev/null; then
+    ok "GRUB_CMDLINE_LINUX_DEFAULT is the pumice one"
+else
+    bad "GRUB_CMDLINE_LINUX_DEFAULT differs: $(grep '^GRUB_CMDLINE_LINUX_DEFAULT' /etc/default/grub 2>/dev/null)"
+fi
+
+head_ "zfs"
+if [ "${zfs_in_use}" = "1" ]; then
+    if pkg_installed zfsutils-linux; then ok "zfsutils-linux kept"; else bad "zfsutils-linux was removed"; fi
+    gone /etc/dracut.conf.d/99-kiwi-ubuntu-no-zfs.conf
+    for u in zfs-import-scan.service zfs-import-cache.service zfs-mount.service zfs.target; do
+        state=$(systemctl is-enabled "${u}" 2>&1 || true)
+        if [ "${state}" = "masked" ]; then bad "${u} is masked"; else ok "${u} not masked (${state})"; fi
+    done
+    if [ "${root_fstype}" = "zfs" ]; then
+        if zpool status -x 2>/dev/null | grep -q 'all pools are healthy'; then ok "zpool status: all pools healthy"; else bad "zpool status -x: $(zpool status -x 2>&1 | head -3 | tr '\n' ' ')"; fi
+    fi
+    if [ -f "${initrd}" ] && command -v lsinitrd >/dev/null 2>&1; then
+        n=$(lsinitrd "${initrd}" 2>/dev/null | grep -c -i zfs || true)
+        if [ "${root_fstype}" = "zfs" ]; then
+            # a zfs root needs zfs in the initramfs, otherwise it will not boot
+            if [ "${n}" -gt 0 ]; then ok "initramfs contains zfs (${n} entries)"; else bad "initramfs has NO zfs but root is on zfs, this may not boot"; fi
+        else
+            # hostonly dracut only adds the zfs module for a zfs root
+            info "root is not zfs, zfs entries in initramfs: ${n} (0 is fine)"
+        fi
+    else
+        info "can't inspect ${initrd} (lsinitrd missing?)"
+    fi
+else
+    for p in zfsutils-linux zfs-zed libzfs7linux; do
+        if pkg_installed "${p}"; then bad "package still installed: ${p}"; else ok "package removed: ${p}"; fi
+    done
+    if [ -f /etc/dracut.conf.d/99-kiwi-ubuntu-no-zfs.conf ]; then ok "99-kiwi-ubuntu-no-zfs.conf present"; else bad "99-kiwi-ubuntu-no-zfs.conf missing"; fi
+    for u in zfs-import-scan.service zfs-mount.service zfs.target; do
+        state=$(systemctl is-enabled "${u}" 2>&1 || true)
+        if [ "${state}" = "masked" ]; then ok "${u} masked"; else bad "${u} not masked (${state})"; fi
+    done
+    if [ -f "${initrd}" ] && command -v lsinitrd >/dev/null 2>&1; then
+        # the zfs kernel modules (linux-main-modules-zfs) can stay, nothing loads them
+        # without modules-load.d, the dracut module or the zfs units
+        zlist=$(lsinitrd "${initrd}" 2>/dev/null | grep -i zfs | grep -v -E 'usr/lib/modules/[^/]+/ubuntu/dkms/zfs' || true)
+        n=$(printf '%s' "${zlist}" | grep -c . || true)
+        if [ "${n}" -eq 0 ]; then ok "initramfs has no zfs (kernel module files aside)"; else bad "initramfs still has zfs (${n} entries): $(echo "${zlist}" | awk '{print $NF}' | tr '\n' ' ')"; fi
+    else
+        info "can't inspect ${initrd} (lsinitrd missing?)"
+    fi
+fi
+
+head_ "system health"
+failed=$(systemctl --failed --no-legend --plain 2>/dev/null | awk '{print $1}')
+if [ -z "${failed}" ]; then ok "no failed units"; else bad "failed units: $(echo "${failed}" | tr '\n' ' ')"; fi
+if dpkg --audit 2>/dev/null | grep -q .; then bad "dpkg --audit reports problems"; else ok "dpkg --audit clean"; fi
+if [ -d /etc/dracut.conf.d ]; then info "dracut.conf.d: $(ls /etc/dracut.conf.d | tr '\n' ' ')"; fi
+
+head_ "cleanup logs (all boots)"
+journalctl -t pumice_early_cleanup -t pumice_firstboot_cleanup --no-pager -o short-monotonic 2>/dev/null \
+    | sed 's/^/  /' || true
+if ! journalctl -t pumice_firstboot_cleanup --no-pager 2>/dev/null | grep -q 'done\.'; then
+    bad "pumice_firstboot_cleanup never logged 'done.' (it may have aborted)"
+else
+    ok "pumice_firstboot_cleanup logged 'done.'"
+fi
+
+printf '\n== result: %d ok, %d failed\n' "${pass}" "${fail}"
+[ "${fail}" -eq 0 ]

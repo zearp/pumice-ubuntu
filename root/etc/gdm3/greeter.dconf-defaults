@@ -1,0 +1,11 @@
+# set gdm to match the theme set in /etc/dconf/db/local.d/98-pumice
+#
+
+[org/gnome/desktop/interface]
+accent-color='purple'
+color-scheme='prefer-dark'
+gtk-theme='Yaru-purple-dark'
+icon-theme='Yaru-purple-dark'
+
+[org/gnome/login-screen]
+logo='/usr/local/share/pumice/ubuntu_bw.png'
