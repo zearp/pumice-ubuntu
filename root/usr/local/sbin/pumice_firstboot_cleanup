@@ -1,0 +1,146 @@
+#!/bin/bash
+#
+# runs once on the very first boot post install
+# (this file will be automatically removed upon first boot)
+#
+set -euo pipefail
+
+log() { echo "pumice_firstboot_cleanup: $*" | systemd-cat -t pumice_firstboot_cleanup; }
+
+root_fstype=$(findmnt -no FSTYPE / || echo unknown)
+
+if [ "${root_fstype}" = "overlay" ]; then
+    log "root is an overlay (live session) - nothing to clean up, staying seeded for the installer."
+else
+    log "root is ${root_fstype} (installed system) - purging live-only installer tooling."
+
+    # sets zsh shell for user created during install
+    if real_user=$(getent passwd 1000 | cut -d: -f1) && [ -n "${real_user}" ]; then
+        chsh -s /usr/bin/zsh "${real_user}" \
+            && log "set ${real_user}'s (uid 1000) shell to zsh." \
+            || log "WARNING: chsh failed for ${real_user} (uid 1000) - left shell unchanged."
+    else
+        log "WARNING: no uid 1000 user found - installer's user-creation convention may have changed, shell not adjusted."
+    fi
+
+    # clean up "liveuser" left overs
+    rm -f /etc/gdm3/custom.conf
+    dpkg-reconfigure gdm3 >/dev/null 2>&1 || true
+    rm -f /etc/sudoers.d/liveuser
+    systemctl disable pumice_liveuser_setup.service >/dev/null 2>&1 || true
+    rm -f /etc/systemd/system/pumice_liveuser_setup.service
+    rm -f /usr/local/sbin/pumice_liveuser_setup
+
+    # clean up auto start for installer
+    rm -f /etc/xdg/autostart/ubuntu-desktop-bootstrap.desktop
+    rm -f /usr/local/bin/pumice_launch_installer
+
+    # clean up installer snapd polkit bypass
+    rm -f /etc/polkit-1/rules.d/60-pumice_live_snapd.rules
+
+    # remove left over cdrom.sources and curtin apt stuff
+    rm -f /etc/apt/sources.list.d/cdrom.sources
+    rm -f /etc/apt/sources.list.d/ubuntu.sources.curtin.orig
+
+    # clean up cdrom mount point fix
+    systemctl disable pumice_cdrom_compat.service >/dev/null 2>&1 || true
+    rm -f /etc/systemd/system/pumice_cdrom_compat.service
+    umount /cdrom >/dev/null 2>&1 || true
+    rmdir /cdrom >/dev/null 2>&1 || true
+
+    # clean up early clean up service
+    systemctl disable pumice_early_cleanup.service >/dev/null 2>&1 || true
+    rm -f /etc/systemd/system/pumice_early_cleanup.service
+
+    # clean up zfs masking
+    systemctl disable pumice_live_zfs_mask.service >/dev/null 2>&1 || true
+    rm -f /etc/systemd/system/pumice_live_zfs_mask.service
+    rm -f /usr/local/sbin/pumice_live_zfs_mask
+
+    # clean up snaps then remove snapd
+    # snap list order doesn't respect dependencies (e.g. a base snap can be
+    # listed before the app snap still using it), so a single pass can leave
+    # snaps behind - retry until a pass removes nothing more.
+    if command -v snap >/dev/null 2>&1; then
+        prev_count=-1
+        while :; do
+            remaining=$(snap list 2>/dev/null | awk 'NR>1 {print $1}')
+            [ -z "${remaining}" ] && break
+            count=$(printf '%s\n' "${remaining}" | wc -l)
+            [ "${count}" -eq "${prev_count}" ] && break
+            prev_count=${count}
+            for snap_name in ${remaining}; do
+                snap remove --purge "${snap_name}" 2>/dev/null || true
+            done
+        done
+    fi
+    systemctl stop snapd.socket snapd.service snapd.seeded.service >/dev/null 2>&1 || true
+    apt-get -y purge snapd >/dev/null 2>&1 || true
+    rm -rf /var/lib/snapd /var/cache/snapd /snap /home/*/snap || true
+    find /var/snap -mindepth 1 -delete 2>/dev/null || true
+
+    # clean up some left overs
+    apt-get -y purge kiwi-dracut-live xorriso dialog >/dev/null 2>&1 || true
+
+    # restore stock oobe by deleting this mask
+    rm -f /etc/systemd/user/gnome-initial-setup-first-login.service
+
+    # remove any live only dconf setting
+    rm -f /etc/dconf/db/local.d/99-pumice_live
+    dconf update || true
+
+    # restore sleep settings to stock
+    systemctl unmask sleep.target suspend.target hibernate.target hybrid-sleep.target || true
+
+    # sort out flicker free/silent boot and clean up
+    if [ -f /etc/default/grub ]; then
+        sed -i \
+            's/^GRUB_CMDLINE_LINUX_DEFAULT=.*/GRUB_CMDLINE_LINUX_DEFAULT="quiet splash vt.global_cursor_default=0 intel_iommu=on amd_iommu=on iommu=pt thunderbolt.host_reset=false biosdevname=0 net.ifnames=0"/' /etc/default/grub
+        rm -f /etc/default/grub.d/99-pumice_firstboot.cfg
+
+        update-grub || true
+    fi
+
+    # disable zfs auto-activation on non-zfs installs
+    if [ "$(findmnt -no FSTYPE / 2>/dev/null)" != "zfs" ] \
+        && [ -z "$(findmnt -rn -t zfs 2>/dev/null)" ] \
+        && [ -z "$(zpool list -H 2>/dev/null)" ]; then
+        log "no ZFS pool/dataset in use on this install - disabling ZFS auto-activation."
+        systemctl mask --now \
+            zfs.target \
+            zfs-import.target \
+            zfs-import-scan.service \
+            zfs-import-cache.service \
+            zfs-load-module.service \
+            zfs-volumes.target \
+            zfs-volume-wait.service \
+            zfs-mount.service \
+            zfs-share.service \
+	    zfs-zed.service \
+            >/dev/null 2>&1 || true
+
+	# omit dracut zfs modules
+        mkdir -p /etc/dracut.conf.d
+        {
+            echo "# This install isn't using zfs and zfs boot support is disabled."
+            echo "# Delete this file and re-run \`dracut -f --regenerate-all\` to bring it back."
+            echo "#"
+            echo 'omit_dracutmodules+=" zfs zfsexpandknowledge "'
+        } > /etc/dracut.conf.d/99-kiwi-ubuntu-no-zfs.conf
+        dracut -f --regenerate-all >/dev/null 2>&1 || true
+
+        log "ZFS auto-activation disabled and initramfs regenerated without ZFS support."
+    else
+        log "ZFS pool/dataset detected - already getting normal ZFS auto-import/mount, nothing to undo."
+    fi
+
+    log "done."
+fi
+
+# self-disable regardless of branch taken above
+# this only ever needs to run once per boot medium
+systemctl disable pumice_firstboot_cleanup || true
+rm -f /etc/systemd/system/pumice_firstboot_cleanup.service
+rm -f "$0"
+
+exit 0
