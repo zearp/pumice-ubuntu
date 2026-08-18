@@ -1,0 +1,8 @@
+// live only polkit bypass
+// (this file will be automatically removed upon first boot)
+polkit.addRule(function(action, subject) {
+    if (action.id == "io.snapcraft.snapd.manage-configuration" &&
+        subject.user == "liveuser") {
+        return polkit.Result.YES;
+    }
+});

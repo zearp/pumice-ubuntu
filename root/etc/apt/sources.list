@@ -1,0 +1,16 @@
+# Ubuntu's traditional sources.list has been replaced by DEB822-format
+# sources managed by /etc/apt/sources.list.d/ubuntu.sources.
+#
+# This file exists deliberately empty (matching what real official
+# Ubuntu 26.04 images ship) rather than being absent entirely -
+# subiquity's own apt configurer (subiquity/server/apt.py) renames this
+# exact path away during install and back again once it's done. The
+# "away" half is wrapped in contextlib.suppress(FileNotFoundError), so
+# it tolerates this file's absence just fine, but the final "back" half
+# is not similarly guarded - confirmed the hard way via a live crash at
+# the very last step of an otherwise fully successful install:
+# FileNotFoundError: [Errno 2] No such file or directory:
+# '/target/etc/apt/sources.list'. Shipping this placeholder gives that
+# rename-away/rename-back roundtrip something to actually round-trip.
+#
+# See /etc/apt/sources.list.d/ubuntu.sources for the actual configuration.

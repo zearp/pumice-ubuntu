@@ -1,0 +1,196 @@
+<?xml version="1.0" encoding="utf-8"?>
+<image schemaversion="8.5" name="pumice_ubuntu" displayname="Pumice Ubuntu">
+    <description type="system">
+        <author>zearp</author>
+        <contact>https://github.com/zearp</contact>
+        <specification>Ubuntu 26.04 (Resolute Raccoon)</specification>
+    </description>
+    <profiles>
+        <profile name="Live" description="Ubuntu 26.04 desktop live/installer ISO: ubuntu-desktop + snapd + ubuntu-desktop-bootstrap, autologin/autostart. Snaps are purged from the installed system on first real boot."/>
+    </profiles>
+    <preferences>
+        <version>26.04</version>
+        <packagemanager>apt</packagemanager>
+        <rpm-check-signatures>false</rpm-check-signatures>
+        <type image="iso" flags="overlay" filesystem="squashfs" squashfscompression="zstd"
+              firmware="uefi" efiparttable="gpt" eficsm="false"
+              publisher="pumice_ubuntu" volid="Ubuntu_26_04" application_id="Ubuntu_26_04"
+              kernelcmdline="quiet splash vt.global_cursor_default=0 intel_iommu=on amd_iommu=on iommu=pt thunderbolt.host_reset=false biosdevname=0 net.ifnames=0">
+            <bootloader name="grub2" timeout="10" grub_template="grub.cfg.iso-template"/>
+        </type>
+    </preferences>
+
+    <!-- setup root account, password is desiabled as we use sudo -->
+    <users>
+        <user password="!" home="/root" name="root" groups="root"/>
+    </users>
+
+    <!-- repo setup -->
+    <repository type="apt-deb" alias="Resolute" distribution="resolute" components="main restricted universe multiverse" repository_gpgcheck="false">
+        <source path="http://archive.ubuntu.com/ubuntu/"/>
+    </repository>
+    <repository type="apt-deb" alias="Resolute-updates" distribution="resolute-updates" components="main restricted universe multiverse" repository_gpgcheck="false">
+        <source path="http://archive.ubuntu.com/ubuntu/"/>
+    </repository>
+    <repository type="apt-deb" alias="Resolute-security" distribution="resolute-security" components="main restricted universe multiverse" repository_gpgcheck="false">
+        <source path="http://security.ubuntu.com/ubuntu/"/>
+    </repository>
+
+    <!-- default package selection, this is where to add new (meta) packages-->
+    <packages type="image" patternType="plusRecommended">
+        <package name="bat"/>
+        <package name="bcache-tools"/>
+        <package name="btop"/>
+        <package name="btrfs-progs"/>
+        <package name="cryptsetup"/>
+<!--    <package name="dconf-editor"/> -->
+        <package name="drm-info"/>
+        <package name="eza"/>
+        <package name="fastfetch"/>
+        <package name="flatpak"/>
+        <package name="flatseal"/>
+        <package name="gnome-shell-extension-alphabetical-grid"/>
+        <package name="gnome-shell-extension-manager"/>
+        <!-- uncomment for gui package management
+        <package name="gnome-software"/>
+        <package name="gnome-software-plugin-deb"/>
+        <package name="gnome-software-plugin-flatpak"/>
+        <package name="gnome-software-plugin-fwupd"/>
+        -->
+        <package name="gnome-tweaks"/>
+        <package name="gnome-weather"/>
+        <package name="grub-efi-amd64"/>
+        <package name="grub-efi-amd64-signed"/>
+        <package name="htop"/>
+<!--    <package name="i965-va-driver"/> -->
+        <package name="intel-gpu-tools"/>
+        <package name="intel-media-va-driver-non-free"/>
+<!--    <package name="ipcalc"/> -->
+<!--    <package name="iperf3"/> -->
+        <package name="kbd"/>
+        <!-- installed but disabled/masked by default, see config.sh and
+             /usr/local/sbin/pumice_keyd_enable -->
+        <package name="keyd"/>
+        <package name="keyd-application-mapper"/>
+        <package name="kiwi-dracut-live"/>
+        <package name="libimage-exiftool-perl"/>
+        <package name="libpam-fprintd"/>
+        <package name="linux-generic"/>
+        <package name="lm-sensors"/>
+        <package name="lvm2"/>
+        <package name="mc"/>
+        <package name="mdadm"/>
+<!--    <package name="mpv"/> -->
+        <package name="ncdu"/>
+        <package name="nvtop"/>
+        <package name="openssh-server"/>
+        <package name="os-prober"/>
+<!--    <package name="plocate"/> -->
+        <package name="powertop"/>
+        <package name="radeontop"/>
+        <package name="ripgrep"/>
+        <package name="shim-signed"/>
+        <package name="snapd"/>
+<!--    <package name="software-properties-gtk"/> -->
+        <package name="stress-ng"/>
+        <package name="systemd-zram-generator"/>
+<!--    <package name="tio"/> -->
+        <package name="ubuntu-advantage-tools"/>
+        <package name="ubuntu-desktop-minimal"/>
+        <package name="ubuntu-minimal"/>
+        <package name="ubuntu-standard"/>
+        <package name="vainfo"/>
+        <package name="vulkan-tools"/>
+        <package name="wavemon"/>
+<!--    <package name="whois"/> -->
+<!--    <package name="yt-dlp"/> -->
+        <package name="zfs-dracut"/>
+        <package name="zfsutils-linux"/>
+        <package name="zsh"/>
+        <package name="zsh-autosuggestions"/>
+        <package name="zsh-syntax-highlighting"/>
+    </packages>
+
+    <!-- delete packages listed below, runs after config.sh
+         use images.sh for chroot operations after the deletes  -->
+    <packages type="delete">
+        <package name="baobab"/>
+        <package name="bluez-cups"/>
+        <package name="brltty"/>
+        <package name="cups"/>
+        <package name="cups-browsed"/>
+        <package name="cups-bsd"/>
+        <package name="cups-client"/>
+        <package name="cups-core-drivers"/>
+        <package name="cups-daemon"/>
+        <package name="cups-filters"/>
+        <package name="cups-filters-core-drivers"/>
+        <package name="cups-ipp-utils"/>
+        <package name="cups-pk-helper"/>
+        <package name="cups-ppdc"/>
+        <package name="cups-server-common"/>
+        <package name="dc"/>
+        <package name="espeak-ng-data"/>
+        <package name="firefox"/>
+        <package name="fwupd"/>
+        <package name="fwupd-signed"/>
+        <package name="gdb"/>
+        <package name="gnome-accessibility-themes"/>
+        <package name="gnome-calculator"/>
+        <package name="gnome-characters"/>
+        <package name="gnome-font-viewer"/>
+        <package name="gnome-logs"/>
+        <package name="gnome-remote-desktop"/>
+        <package name="gnome-terminal"/>
+        <package name="gnome-terminal-data"/>
+        <package name="gnome-user-docs"/>
+        <package name="hplip"/>
+        <package name="hplip-data"/>
+        <package name="initramfs-tools-bin"/>
+        <package name="initramfs-tools-core"/>
+        <package name="ipp-usb"/>
+        <package name="kdump-tools"/>
+        <package name="libespeak-ng1"/>
+        <package name="libppd2"/>
+        <package name="libppd2-common"/>
+        <package name="libsane-hpaio"/>
+        <package name="memtest86+"/>
+        <package name="modemmanager"/>
+        <package name="mscompress"/>
+        <package name="orca"/>
+        <package name="printer-driver-brlaser"/>
+        <package name="printer-driver-c2esp"/>
+        <package name="printer-driver-foo2zjs"/>
+        <package name="printer-driver-foo2zjs-common"/>
+        <package name="printer-driver-hpcups"/>
+        <package name="printer-driver-m2300w"/>
+        <package name="printer-driver-min12xxw"/>
+        <package name="printer-driver-postscript-hp"/>
+        <package name="printer-driver-ptouch"/>
+        <package name="printer-driver-pxljr"/>
+        <package name="printer-driver-sag-gdi"/>
+        <package name="printer-driver-splix"/>
+        <package name="python3-brlapi"/>
+        <package name="python3-cups"/>
+        <package name="python3-cupshelpers"/>
+        <package name="python3-speechd"/>
+        <package name="resources"/>
+        <package name="sane-airscan"/>
+        <package name="sane-utils"/>
+        <package name="speech-dispatcher"/>
+        <package name="speech-dispatcher-espeak-ng"/>
+        <package name="sysprof"/>
+        <package name="system-config-printer-common"/>
+        <package name="system-config-printer-udev"/>
+        <package name="ubuntu-docs"/>
+        <package name="ubuntu-insights"/>
+        <package name="ubuntu-report"/>
+        <package name="unattended-upgrades"/>
+    </packages>
+
+    <!-- bootstrap packages -->
+    <packages type="bootstrap">
+        <package name="gnupg"/>
+        <package name="ubuntu-keyring"/>
+    </packages>
+</image>
