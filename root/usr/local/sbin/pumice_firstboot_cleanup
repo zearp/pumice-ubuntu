@@ -52,6 +52,11 @@ else
     systemctl disable pumice_early_cleanup.service >/dev/null 2>&1 || true
     rm -f /etc/systemd/system/pumice_early_cleanup.service
 
+    # clean up backlight tweaks
+    rm -f /etc/udev/rules.d/51-pumice_backlight_default.rules
+    rm -f /usr/local/sbin/pumice_backlight_default
+    rm -f /var/lib/pumice-backlight-\*
+
     # clean up zfs masking
     systemctl disable pumice_live_zfs_mask.service >/dev/null 2>&1 || true
     rm -f /etc/systemd/system/pumice_live_zfs_mask.service

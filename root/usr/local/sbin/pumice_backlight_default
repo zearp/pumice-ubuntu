@@ -4,12 +4,13 @@
 # some laptops/screens default to 100% which is too bright
 # only runs once per device (marker file in /var/lib/pumice)
 # it will not override brightness the user sets themselves
+# (this file will be automatically removed upon first boot)
 #
 set -eu
 
 name="$1"
 backlight="/sys/class/backlight/${name}"
-marker="/var/lib/pumice/backlight-defaulted-${name}"
+marker="/var/lib/pumice-backlight-${name}"
 
 [ -d "${backlight}" ] || exit 0
 [ -f "${marker}" ] && exit 0

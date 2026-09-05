@@ -1,4 +1,4 @@
-# needed by subiquity/ubuntu-desktop-bootstrap, installs will fail without
+# needed by subiquity/ubuntu-desktop-bootstrap and will fail without
 #
 version: 2
 kernel:
